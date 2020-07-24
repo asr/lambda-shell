@@ -15,6 +15,7 @@ Description:
   evaluating terms of the pure, untyped lambda calculus.  The Lambda
   Shell builds on the shell creation framework Shellac, and showcases
   most of Shellac's features.
+tested-with:     GHC == 8.10.1
 
 Executable lambdaShell
   Main-Is: main.hs
