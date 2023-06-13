@@ -1,3 +1,6 @@
 *~
 .stack-work
+cabal.project
 dist/
+dist-newstyle/
+lambda.history
