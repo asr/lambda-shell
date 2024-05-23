@@ -1,7 +1,0 @@
-packages: *.cabal
-with-compiler: /home/asr/.ghcup/ghc/9.2.8/bin/ghc
-
-source-repository-package
-  type: git
-  location: https://github.com/robdockins/shellac.git
-  tag: c39281bf036bd57f40024febd52ae33aa4555dd2
