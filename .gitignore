@@ -1,7 +1,6 @@
 *~
 .stack-work
 TAGS
-cabal.project
 dist/
 dist-newstyle/
 lambda.history
