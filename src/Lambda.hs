@@ -184,7 +184,7 @@ showLambdas :: Env.Env
             -> Int
             -> ShowS
 
-showLambdas env 0 = id
+showLambdas _   0 = id
 showLambdas env x =
     ( showChar '\\'
     . showString
@@ -208,7 +208,7 @@ lamShift c d v@(Var a x)
 
 lamShift c d (Lam a label t)  = Lam a label (lamShift (c+1) d t)
 lamShift c d (App a t1 t2)    = App a (lamShift c d t1) (lamShift c d t2)
-lamShift c d b@(Binding _ _)  = b
+lamShift _ _ b@(Binding _ _)  = b
 
 
 ------------------------------------------------------------------------------
@@ -235,7 +235,7 @@ lamSubst' s var c v@(Var _ x)
 
 lamSubst' s var c (Lam a label t)  = Lam a label (lamSubst' s var (c+1) t)
 lamSubst' s var c (App a t1 t2)    = App a (lamSubst' s var c t1) (lamSubst' s var c t2)
-lamSubst' s var c b@(Binding _ _)  = b
+lamSubst' _ _   _ b@(Binding _ _)  = b
 
 
 -------------------------------------------------------------------------------------
@@ -258,11 +258,11 @@ lamReduceNull _ _ _ = Nothing
 
 lamReduceWHNF :: ReductionStrategy a l
 
-lamReduceWHNF b unfold (App _ (Lam _ _ t1) t2) = Just (lamSubst t2 t1)
-lamReduceWHNF b unfold (App a t1 t2)           = lamReduceWHNF b True t1   >>= \t1' -> return (App a t1' t2)
-lamReduceWHNF b unfold (Lam a l t)             = Nothing
-lamReduceWHNF b unfold (Var _ _)               = Nothing
-lamReduceWHNF b unfold (Binding a name)        = if unfold then lookupBinding name b else Nothing
+lamReduceWHNF _ _      (App _ (Lam _ _ t1) t2) = Just (lamSubst t2 t1)
+lamReduceWHNF b _      (App a t1 t2)           = lamReduceWHNF b True t1   >>= \t1' -> return (App a t1' t2)
+lamReduceWHNF _ _      (Lam _ _ _)             = Nothing
+lamReduceWHNF _ _      (Var _ _)               = Nothing
+lamReduceWHNF b unfold (Binding _ name)        = if unfold then lookupBinding name b else Nothing
 
 
 -------------------------------------------------------------------------------------
@@ -270,11 +270,11 @@ lamReduceWHNF b unfold (Binding a name)        = if unfold then lookupBinding na
 
 lamReduceHNF :: ReductionStrategy a l
 
-lamReduceHNF b unfold (App _ (Lam _ _ t1) t2)  = Just (lamSubst t2 t1)
-lamReduceHNF b unfold (App a t1 t2)            = lamReduceHNF b True t1   >>= \t1' -> return (App a t1' t2)
-lamReduceHNF b unfold (Lam a l t)              = lamReduceHNF b unfold t  >>= \t'  -> return (Lam a l t')
-lamReduceHNF b unfold (Var _ _)                = Nothing
-lamReduceHNF b unfold (Binding a name)         = if unfold then lookupBinding name b else Nothing
+lamReduceHNF _ _      (App _ (Lam _ _ t1) t2) = Just (lamSubst t2 t1)
+lamReduceHNF b _      (App a t1 t2)           = lamReduceHNF b True t1   >>= \t1' -> return (App a t1' t2)
+lamReduceHNF b unfold (Lam a l t)             = lamReduceHNF b unfold t  >>= \t'  -> return (Lam a l t')
+lamReduceHNF _ _      (Var _ _)               = Nothing
+lamReduceHNF b unfold (Binding _ name)        = if unfold then lookupBinding name b else Nothing
 
 
 
@@ -283,13 +283,13 @@ lamReduceHNF b unfold (Binding a name)         = if unfold then lookupBinding na
 
 lamReduceNF :: ReductionStrategy a l
 
-lamReduceNF b unfold (App _ (Lam _ _ t1) t2)   = Just (lamSubst t2 t1)
-lamReduceNF b unfold (App a t1 t2)             = (lamReduceNF b True t1   >>= \t1' -> return (App a t1' t2))
-                                                   `mplus`
-                                                 (lamReduceNF b unfold t2 >>= \t2' -> return (App a t1 t2'))
-lamReduceNF b unfold (Lam a l t)               = lamReduceNF b unfold t   >>= \t'  -> return (Lam a l t')
-lamReduceNF b unfold (Var _ _)                 = Nothing
-lamReduceNF b unfold (Binding a name)          = if unfold then lookupBinding name b else Nothing
+lamReduceNF _ _      (App _ (Lam _ _ t1) t2) = Just (lamSubst t2 t1)
+lamReduceNF b unfold (App a t1 t2)           = (lamReduceNF b True t1   >>= \t1' -> return (App a t1' t2))
+                                                 `mplus`
+                                               (lamReduceNF b unfold t2 >>= \t2' -> return (App a t1 t2'))
+lamReduceNF b unfold (Lam a l t)             = lamReduceNF b unfold t   >>= \t'  -> return (Lam a l t')
+lamReduceNF _ _      (Var _ _)               = Nothing
+lamReduceNF b unfold (Binding _ name)        = if unfold then lookupBinding name b else Nothing
 
 
 
@@ -298,15 +298,15 @@ lamReduceNF b unfold (Binding a name)          = if unfold then lookupBinding na
 
 lamStrictNF :: ReductionStrategy a l
 
-lamStrictNF b unfold (App a (Lam al l t1) t2)  = (lamStrictNF b True t2 >>= \t2' -> return (App a (Lam al l t1) t2'))
-                                                   `mplus`
-                                                 (Just (lamSubst t2 t1))
-lamStrictNF b unfold (App a t1 t2)             = (lamStrictNF b True t1   >>= \t1' -> return (App a t1' t2))
-                                                   `mplus`
-                                                 (lamStrictNF b unfold t2 >>= \t2' -> return (App a t1 t2'))
-lamStrictNF b unfold (Lam a l t)               = lamStrictNF b unfold t   >>= \t'  -> return (Lam a l t')
-lamStrictNF b unfold (Var _ _)                 = Nothing
-lamStrictNF b unfold (Binding a name)          = if unfold then lookupBinding name b else Nothing
+lamStrictNF b _      (App a (Lam al l t1) t2) = (lamStrictNF b True t2 >>= \t2' -> return (App a (Lam al l t1) t2'))
+                                                  `mplus`
+                                                (Just (lamSubst t2 t1))
+lamStrictNF b unfold (App a t1 t2)            = (lamStrictNF b True t1   >>= \t1' -> return (App a t1' t2))
+                                                  `mplus`
+                                                (lamStrictNF b unfold t2 >>= \t2' -> return (App a t1 t2'))
+lamStrictNF b unfold (Lam a l t)              = lamStrictNF b unfold t   >>= \t'  -> return (Lam a l t')
+lamStrictNF _ _      (Var _ _)                = Nothing
+lamStrictNF b unfold (Binding _ name)         = if unfold then lookupBinding name b else Nothing
 
 
 
@@ -392,4 +392,4 @@ unfoldTop     :: Bindings () String
 
 unfoldTop binds (Binding a x) = maybe (Binding a x) id $
                                   Map.findWithDefault (error $ concat ["'",x,"' not bound"]) x binds
-unfoldTop binds x             = x
+unfoldTop _     x             = x

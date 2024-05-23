@@ -39,7 +39,7 @@ insert label (Env z labels set)
 
 lookup :: Int -> Env -> String
 
-lookup x (Env z labels set) =
+lookup x (Env _ labels _) =
    case drop x labels of
       l:_ -> l
       []  -> error (concat ["'",show x,"' out of bounds in environment ",show labels])

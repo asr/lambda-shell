@@ -147,7 +147,7 @@ compParser b = do
     return (x,y)
 
 declParser :: Bindings () String -> LamParser [String]
-declParser b = do
+declParser _ = do
     string "decl"
     many1 space
     sepBy1 nameParser (many1 space)

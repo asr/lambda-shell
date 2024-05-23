@@ -51,7 +51,7 @@ do_simple_cps b (Binding _ name) =
        maybe (return (Lam () "k" $ App () (Var () 0) $ (Binding () name)))
              (do_simple_cps b)
 
-do_simple_cps b (Var _ i) =
+do_simple_cps _ (Var _ i) =
     return (Lam () "k" $ App () (Var () 0) $ (Var () (i+1)))
 
 do_simple_cps b (Lam _ l t) = do
@@ -84,9 +84,8 @@ do_eta_cps b (Binding _ name) =
       maybe (return (Lam () "k" $ App () (Var () 0) $ (Binding () name)))
             (do_simple_cps b)
 
-do_eta_cps b (Var _ i) =
+do_eta_cps _ (Var _ i) =
     return (Lam () "k" $ App () (Var () 0) $ (Var () (i+1)))
-
 
 do_eta_cps b (Lam _ l t) = do
     t' <- do_eta_cps b (lamShift 2 1 (lamShift 0 1 t))
@@ -96,7 +95,6 @@ do_eta_cps b (Lam _ l t) = do
           Lam () "kk" $ App () t' $
             Lam () "m" $ App () (Var () 1) (Var () 0)
       )
-
 
 do_eta_cps b (App _ t1 t2) = do
     t1' <- do_eta_cps b (lamShift 0 1 t1)
@@ -152,11 +150,11 @@ do_onepass_cps
     -> m (PureLambda Bool String)
 
 do_onepass_cps b (Binding _ name) =
-     lookupBindingM name b >>= 
+     lookupBindingM name b >>=
         maybe (return (Lam True "k" $ App True (Var True 0) $ (Binding False name)))
               (do_onepass_cps b)
 
-do_onepass_cps b (Var _ i) =
+do_onepass_cps _ (Var _ i) =
      return (Lam True "k" $ App True (Var True 0) $ (Var False (i+1)))
 
 do_onepass_cps b (Lam _ l t) = do
@@ -189,7 +187,7 @@ do_onepass_cps_tail b (Binding _ name) =
        maybe (return (Lam True "k0" (App False (Var True 0) (Binding False name))))
              (do_onepass_cps_tail b)
 
-do_onepass_cps_tail b (Var _ i) =
+do_onepass_cps_tail _ (Var _ i) =
     return (Lam True "k0" (App False (Var True 0) (Var False (i+1))))
 
 do_onepass_cps_tail b (Lam _ l t) = do
