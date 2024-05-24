@@ -1,7 +1,7 @@
 cabal-version:   3.0
 Name:            LambdaShell
 Build-Type:	 Simple
-Version:         0.9.9
+Version:         0.9.9.1
 License:         GPL-2.0-only
 License-file:    LICENSE
 Author:          Robert Dockins
@@ -15,7 +15,8 @@ Description:
   evaluating terms of the pure, untyped lambda calculus.  The Lambda
   Shell builds on the shell creation framework Shellac, and showcases
   most of Shellac's features.
-tested-with:     GHC == 9.10.1
+extra-doc-files: CHANGELOG.md
+tested-with: GHC == 9.10.1
 
 Executable lambdaShell
   Main-Is: Main.hs

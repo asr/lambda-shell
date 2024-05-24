@@ -33,6 +33,7 @@ import System.Exit
 import System.Console.GetOpt
 import Text.ParserCombinators.Parsec (runParser)
 
+-- Local imports
 import Lambda
 import CPS
 import LambdaParser
@@ -73,6 +74,7 @@ data LambdaCmdLineState
      , cmd_input   :: Maybe String
      , cmd_binds   :: Bindings () String
      , cmd_print   :: PrintWhat
+     , cmd_fuel    :: Fuel
      , cmd_trace   :: Maybe (Maybe Int)
      , cmd_red     :: RS
      , cmd_count   :: Bool
@@ -88,6 +90,7 @@ initialCmdLineState =
   , cmd_input   = Nothing
   , cmd_binds   = Map.empty
   , cmd_print   = PrintNothing
+  , cmd_fuel    = maxBound
   , cmd_trace   = Nothing
   , cmd_red     = lamReduceNF
   , cmd_count   = False
@@ -110,6 +113,7 @@ data LambdaCmdLineArgs
   = FullUnfold
   | ReadStdIn
   | Program String
+  | CFuel String
   | Trace (Maybe String)
   | Print PrintWhat
   | Reduction String
@@ -124,6 +128,7 @@ options =
   [ Option ['u']     ["unfold"]      (NoArg FullUnfold)              "perform full unfolding of let-bound terms"
   , Option ['s']     ["stdin"]       (NoArg ReadStdIn)               "read from standard in"
   , Option ['e']     ["program"]     (ReqArg Program "PROGRAM")      "evaluate statements from command line"
+  , Option ['f']     ["fuel"]        (ReqArg CFuel "INT")            "set the maximum number of reductions"
   , Option ['r']     ["trace"]       (OptArg Trace "TRACE_NUM")      "set tracing (and optional trace display length)"
   , Option ['h','?'] ["help"]        (NoArg (Print PrintHelp))       "print this message"
   , Option ['v']     ["version"]     (NoArg (Print PrintVersion))    "print version information"
@@ -135,10 +140,7 @@ options =
            "set the reduction strategy (one of 'whnf', 'hnf', 'nf', 'strict')"
   , Option ['w']     ["history"]     (ReqArg History "HISTORY_FILE")  "set the command history file (default: 'lambda.history')"
   , Option ['q']     ["nohistory"]   (NoArg NoHistory)                "disable command history file"
-
-  , Option ['p']     ["cps"]         (ReqArg Cps "CPS_STRATEGY")
-           "set the CPS strategy (one of 'simple', 'onepass')"
-
+  , Option ['p']     ["cps"]         (ReqArg Cps "CPS_STRATEGY")      "set the CPS strategy (one of 'simple', 'onepass')"
   ]
 
 
@@ -165,6 +167,7 @@ parseCmdLine argv =
         applyFlag NoHistory             st = return st{ cmd_history = Nothing }
         applyFlag (History nm)          st = return st{ cmd_history = Just nm }
         applyFlag (Print printWhat)     st = return st{ cmd_print   = printWhat }
+        applyFlag (CFuel f)             st = return st{ cmd_fuel    = read f }
         applyFlag (Trace Nothing)       st = return st{ cmd_trace   = Just Nothing }
         applyFlag (Trace (Just num))    st = case readDec num of
                                                 ((n,[]):_) -> return st{ cmd_trace = Just (Just n) }
@@ -197,6 +200,7 @@ mapToShellState st =
   initialShellState
   { letBindings = cmd_binds st
   , fullUnfold  = cmd_unfold st
+  , fuel        = cmd_fuel st
   , trace       = isJust (cmd_trace st)
   , traceNum    = let x = traceNum initialShellState
                   in maybe x (maybe x id) (cmd_trace st)
@@ -253,7 +257,7 @@ evalTerm st t = doEval (unfoldTop (cmd_binds st) t)
 
        printTrace x t = putStr $ unlines $ map (printLam (cmd_binds st)) $ take x $ trace t
 
-       eval t  = lamEval      (cmd_binds st) (cmd_unfold st) (cmd_red st) t
+       eval t  = fst $ lamEval (cmd_binds st) (cmd_unfold st) (cmd_red st) (cmd_fuel st) t
        trace t = lamEvalTrace (cmd_binds st) (cmd_unfold st) (cmd_red st) t
 
 
@@ -264,7 +268,7 @@ compareTerms :: IORef ExitCode
             -> IO ()
 
 compareTerms ec st t1 t2 = do
-  if normalEq (cmd_binds st) t1 t2
+  if normalEq (cmd_binds st) (cmd_fuel st) t1 t2
      then putStrLn "equal"     >> setSucc ec
      else putStrLn "not equal" >> setFail ec
 

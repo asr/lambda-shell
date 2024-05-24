@@ -19,22 +19,17 @@
 
 
 module LambdaShell
-( LambdaShellState (..)
-, initialShellState
-, lambdaShell
-, readDefinitionFile
-, RS
-)
+  ( LambdaShellState (..)
+  , initialShellState
+  , lambdaShell
+  , readDefinitionFile
+  , RS
+  )
 where
 
 import Control.Monad.Trans
 import System.IO
 import Data.List (isPrefixOf)
-
-import Lambda
-import LambdaParser
-import CPS
-import Version
 
 import qualified Data.Map as Map
 import Text.ParserCombinators.Parsec (runParser)
@@ -47,12 +42,19 @@ import System.Console.Shell.Backend.Readline
 --import System.Console.Shell.Backend.Compatline
 --import System.Console.Shell.Backend.Haskeline
 
+-- Local imports
+import Lambda
+import LambdaParser
+import CPS
+import Version
+
+------------------------------------------------------------------------------
+
 --defaultBackend = compatlineBackend
 --defaultBackend = haskelineBackend
 defaultBackend = readlineBackend
 
 type RS = ReductionStrategy () String
-
 
 -------------------------------------------------------
 -- Define types to allow completion of let-bound names
@@ -77,16 +79,16 @@ instance Completion LetBinding LambdaShellState where
 
 data LambdaShellState =
   LambdaShellState
-  { trace       :: Bool      -- ^ Step through the reduction one redex at a time
-  , traceNum    :: Int       -- ^ Number of reduction steps to display during tracing
-  , letBindings :: Bindings () String
-                             -- ^ All \"let\" bindings currently in scope
-  , fullUnfold  :: Bool      -- ^ Should binding names be eagerly unfolded?
-  , redStrategy :: RS        -- ^ The reduction strategy currently in use
-  , showCount   :: Bool      -- ^ If true, show the number of reductions at each step
-  , cpsStrategy :: CPS LamParser -- ^ The current CPS strategy
-  , extSyntax   :: Bool      -- ^ Is extended syntax enabled?
-  , histFile    :: Maybe String -- ^ A file for command history
+  { trace       :: Bool                -- ^ Step through the reduction one redex at a time
+  , traceNum    :: Int                 -- ^ Number of reduction steps to display during tracing
+  , letBindings :: Bindings () String  -- ^ All \"let\" bindings currently in scope
+  , fullUnfold  :: Bool                -- ^ Should binding names be eagerly unfolded?
+  , redStrategy :: RS                  -- ^ The reduction strategy currently in use
+  , showCount   :: Bool                -- ^ If true, show the number of reductions at each step
+  , cpsStrategy :: CPS LamParser       -- ^ The current CPS strategy
+  , extSyntax   :: Bool                -- ^ Is extended syntax enabled?
+  , histFile    :: Maybe String        -- ^ A file for command history
+  , fuel        :: Fuel                -- ^ Maximum number of reductions
   }
 
 
@@ -102,6 +104,7 @@ initialShellState =
   , cpsStrategy = simple_cps
   , extSyntax   = True
   , histFile    = Nothing
+  , fuel        = maxBound
   }
 
 -----------------------------------------------------------------
@@ -153,6 +156,7 @@ commands =
   , toggle "showcount" "Toggle the show count mode" showCount  (\x st -> st { showCount = x })
   , toggle "extsyn"    "Toggle extended syntax"     extSyntax  (\x st -> st { extSyntax = x })
 
+  , cmd "fuel"       setFuel         "Set the maximum number of reductions"
   , cmd "tracestep"  setTraceStep    "Set the number of steps shown in trace mode"
   , cmd "dumptrace"  dumpTrace       "Dump a trace of the named term into a file"
   , cmd "showall"    showBindings    "Show all let bindings"
@@ -192,6 +196,8 @@ dumpTrace (File f) steps (Completable termStr) = do
                                   (unfoldTop (letBindings st) term)
          liftIO (writeFile f (unlines . map (printLam (letBindings st)) . take steps $ trace))
 
+setFuel :: Int -> Sh LambdaShellState ()
+setFuel f = getShellSt >>= \st -> putShellSt st { fuel = f }
 
 setTraceStep :: Int -> Sh LambdaShellState ()
 setTraceStep step = getShellSt >>= \st -> putShellSt st{ traceNum = step }
@@ -280,8 +286,10 @@ evaluate str = do
 
 evalExpr :: PureLambda () String -> Sh LambdaShellState ()
 evalExpr t = getShellSt >>= \st -> doEval (unfoldTop (letBindings st) t) st
-
  where
+   doEval :: PureLambda () String
+          -> LambdaShellState
+          -> Sh LambdaShellState ()
    doEval x st
     | trace st     = traceEval x
     | showCount st = evalCount x st
@@ -291,14 +299,22 @@ evalExpr t = getShellSt >>= \st -> doEval (unfoldTop (letBindings st) t) st
       subshell <- liftIO (traceSubshell x)
       shellSpecial (ExecSubshell subshell)
 
+   evalCount :: PureLambda () String
+             -> LambdaShellState
+             -> Sh LambdaShellState ()
    evalCount t st = do
-      let (z,n) = lamEvalCount (letBindings st) (fullUnfold st) (redStrategy st) t
-      shellPutStrLn $ printLam (letBindings st) z
-      shellPutInfoLn $ concat ["<<",show n," reductions>>"]
+     let (z, n, f) = lamEvalCount (letBindings st) (fullUnfold st) (redStrategy st) (fuel st) t
+     if f == 0
+     then shellPutInfoLn "insufficient fuel"
+     else do
+       shellPutStrLn $ printLam (letBindings st) z
+       shellPutInfoLn $ concat ["<<",show n," reductions>>"]
 
    eval t st = do
-      let z = lamEval (letBindings st) (fullUnfold st) (redStrategy st) t
-      shellPutStrLn $ printLam (letBindings st) z
+      let (z, f) = lamEval (letBindings st) (fullUnfold st) (redStrategy st) (fuel st) t
+      if f == 0
+      then shellPutInfoLn "insufficient fuel"
+      else shellPutStrLn $ printLam (letBindings st) z
 
 
 compareExpr :: PureLambda () String
@@ -307,7 +323,7 @@ compareExpr :: PureLambda () String
 
 compareExpr x y = do
     st <- getShellSt
-    if normalEq (letBindings st) x y
+    if normalEq (letBindings st) (fuel st) x y
         then shellPutInfoLn "equal"
         else shellPutInfoLn "not equal"
 
@@ -371,6 +387,7 @@ mkTraceState term st =
           , traceBindings = letBindings st
           }
 
-traceSubshell :: PureLambda () String -> IO (Subshell LambdaShellState TraceShellState)
+traceSubshell :: PureLambda () String
+              -> IO (Subshell LambdaShellState TraceShellState)
 traceSubshell term =
    simpleSubshell (mkTraceState term) mkTraceDesc

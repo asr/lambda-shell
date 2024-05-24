@@ -30,11 +30,13 @@
 -}
 
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 
 module Lambda (
 -- * Type Definitions
   Bindings
 , ReductionStrategy
+, Fuel
 
 -- * Lamda Term Datatype
 , PureLambda (..)
@@ -68,12 +70,18 @@ module Lambda (
 ) where
 
 import Data.List
-import qualified Env as Env
 import qualified Data.Map as Map
 import Control.Monad (MonadPlus (..))
 import qualified Control.Monad.Fail as Fail
 
+-- Local imports
+import qualified Env as Env
+
+------------------------------------------------------------------------------
+
 type Bindings a l = Map.Map String (Maybe (PureLambda a l))
+
+type Fuel = Int
 
 -- From Agda source code: src/full/Agda/Utils/Fail.hs
 -- | A pure MonadFail.
@@ -127,14 +135,15 @@ alphaEq _              _              = False
 --   terms with alpha-equivalant normal forms are in the relation.
 --   This function will diverge for non-normalizing terms.
 
-normalEq     :: Bindings a l    -- ^ Let bindings in scope
-             -> PureLambda a l
-             -> PureLambda a l
-             -> Bool
+normalEq :: Bindings a l    -- ^ Let bindings in scope
+         -> Fuel
+         -> PureLambda a l
+         -> PureLambda a l
+         -> Bool
 
-normalEq binds t1 t2 =
-    let n1 = lamEval binds True lamReduceNF t1
-        n2 = lamEval binds True lamReduceNF t2
+normalEq binds f t1 t2 =
+    let (n1, _) = lamEval binds True lamReduceNF f t1
+        (n2, _) = lamEval binds True lamReduceNF f t2
     in alphaEq n1 n2
 
 -------------------------------------------------------------------
@@ -335,30 +344,59 @@ lamEvalF b unfold reduce f z x =
 -- | Big-step reduction; that is, apply the reduction strategy until
 --   it fails to reduce any futher.
 
-lamEval     :: Bindings a l            -- ^ A set of bindings for unfolding
-             -> Bool                   -- ^ Apply full unfolding ?
-             -> ReductionStrategy a l  -- ^ Reduction strategy to use
-             -> PureLambda a l         -- ^ The term to reduce
-             -> PureLambda a l         -- ^ The evaluated term
+lamEval :: forall a l.
+  Bindings a l              -- ^ A set of bindings for unfolding
+  -> Bool                   -- ^ Apply full unfolding ?
+  -> ReductionStrategy a l  -- ^ Reduction strategy to use
+  -> Fuel                   -- ^ Maximum number of reductions
+  -> PureLambda a l         -- ^ The term to reduce
+  -> (PureLambda a l, Fuel) -- ^ The evaluated term
 
-lamEval bind unfold red = eval
-  where evalF  = lamEvalF bind unfold red
-        eval x = evalF eval id x
+lamEval bind unfold red f = eval f
+  where
+  evalF :: (PureLambda a l -> (PureLambda a l, Fuel))
+        -> (PureLambda a l -> (PureLambda a l, Fuel))
+        -> PureLambda a l
+        -> (PureLambda a l, Fuel)
+  evalF  = lamEvalF bind unfold red
+
+  eval :: Fuel
+       -> PureLambda a l
+       -> (PureLambda a l, Fuel)
+  eval f x =
+    if f == 0
+    then (x, f)
+    else evalF (\t -> eval (pred f) t) (\t -> (t, f)) x
 
 
 
 -------------------------------------------------------------------------------------
 -- | Big-step reduction that counts the number of reductions performed
 
-lamEvalCount :: Bindings a l           -- ^ A set of bindings for unfolding
-             -> Bool                   -- ^ Apply full unfolding ?
-             -> ReductionStrategy a l  -- ^ Reduction strategy to use
-             -> PureLambda a l         -- ^ The term to reduce
-             -> (PureLambda a l,Integer) -- ^ The evaluated term and reduction count
+lamEvalCount :: forall a l.
+  Bindings a l                    -- ^ A set of bindings for unfolding
+  -> Bool                         -- ^ Apply full unfolding ?
+  -> ReductionStrategy a l        -- ^ Reduction strategy to use
+  -> Fuel                         -- ^ Maximum number of reductions
+  -> PureLambda a l               -- ^ The term to reduce
+  -> (PureLambda a l, Int, Fuel)  -- ^ The evaluated term and reduction count
 
-lamEvalCount bind unfold red = eval 0
-  where evalF     = lamEvalF bind unfold red
-        eval n x  = evalF (\t -> eval (succ n) t) (\t -> (t,n)) x
+lamEvalCount bind unfold red f = eval 0 f
+  where
+  evalF :: (PureLambda a l -> (PureLambda a l, Int, Fuel))
+        -> (PureLambda a l -> (PureLambda a l, Int, Fuel))
+        -> PureLambda a l
+        -> (PureLambda a l, Int, Fuel)
+  evalF = lamEvalF bind unfold red
+
+  eval :: Int
+       -> Fuel
+       -> PureLambda a l
+       -> (PureLambda a l, Int, Fuel)
+  eval n f x  =
+    if f == 0
+    then (x, n, f)
+    else evalF (\t -> eval (succ n) (pred f) t) (\t -> (t, n, f)) x
 
 
 -------------------------------------------------------------------------------------
