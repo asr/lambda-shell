@@ -66,6 +66,11 @@ pair = \x y f. f x y;
 fst  = \p. p (\x y. x);
 snd  = \p. p (\x y. y);
 
+# sum type.
+left = \x l r. l x;
+right = \x l r. r x;
+case = \c l r. c l r;
+
 # now, encode ADTs
 match = \x pats. x (\n f. f (fst ((n snd) pats)));
 
