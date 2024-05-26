@@ -58,7 +58,7 @@ omega = (\x. x x) \x. x x;
 
 # factorial
 fac = Y (\facF n. if (iszero n)
-                     one 
+                     one
                      (mul n (facF (pred n))));
 
 # the church encoding for pairs
