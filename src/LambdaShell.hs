@@ -310,6 +310,9 @@ evalExpr t = getShellSt >>= \st -> doEval (unfoldTop (letBindings st) t) st
        shellPutStrLn $ printLam (letBindings st) z
        shellPutInfoLn $ concat ["<<",show n," reductions>>"]
 
+   eval :: PureLambda () String
+        -> LambdaShellState
+        -> Sh LambdaShellState ()
    eval t st = do
       let (z, f) = lamEval (letBindings st) (fullUnfold st) (redStrategy st) (fuel st) t
       if f == 0
