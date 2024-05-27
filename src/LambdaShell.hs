@@ -63,7 +63,7 @@ completeLetBindings :: LambdaShellState -> String -> IO [String]
 completeLetBindings st prefix =
     return . filter (prefix `isPrefixOf`) . Map.keys . letBindings $ st
 
-data LetBinding = LetBinding
+data LetBinding
 
 instance Completion LetBinding LambdaShellState where
   complete _         = completeLetBindings
