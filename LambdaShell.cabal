@@ -37,6 +37,6 @@ Executable lambdaShell
   Build-Depends:
      base == 4.*,
      parsec, mtl,
-     Shellac >= 0.9.9,
+     Shellac >= 0.9.9.1,
      Shellac-readline,
      containers
