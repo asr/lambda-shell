@@ -38,5 +38,5 @@ Executable lambdaShell
      base == 4.*,
      parsec, mtl,
      Shellac >= 0.9.9.1,
-     Shellac-readline,
+     Shellac-haskeline >= 0.9.9.1,
      containers

@@ -38,9 +38,9 @@ import System.Console.Shell
 import System.Console.Shell.ShellMonad
 
 
-import System.Console.Shell.Backend.Readline
+-- import System.Console.Shell.Backend.Readline
 --import System.Console.Shell.Backend.Compatline
---import System.Console.Shell.Backend.Haskeline
+import System.Console.Shell.Backend.Haskeline
 
 -- Local imports
 import Lambda
@@ -51,8 +51,8 @@ import Version
 ------------------------------------------------------------------------------
 
 --defaultBackend = compatlineBackend
---defaultBackend = haskelineBackend
-defaultBackend = readlineBackend
+defaultBackend = haskelineBackend
+-- defaultBackend = readlineBackend
 
 type RS = ReductionStrategy () String
 
