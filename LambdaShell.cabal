@@ -16,7 +16,7 @@ Description:
   Shell builds on the shell creation framework Shellac, and showcases
   most of Shellac's features.
 extra-doc-files: CHANGELOG.md
-tested-with: GHC == 9.10.1
+tested-with: GHC == 9.12.2
 
 Executable lambdaShell
   Main-Is: Main.hs

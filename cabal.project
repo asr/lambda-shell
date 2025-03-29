@@ -3,10 +3,15 @@ packages: *.cabal
 source-repository-package
   type: git
   location: https://github.com/asr/shellac.git
-  tag: 41ec89f6771db97d064c1709d5105ed802522a7f
+  tag: 5f379a8ee6bc1765507ded691bd701f85a1673b7
 
 source-repository-package
   type: git
   location: https://github.com/asr/shellac.git
-  tag: 41ec89f6771db97d064c1709d5105ed802522a7f
+  tag: 5f379a8ee6bc1765507ded691bd701f85a1673b7
   subdir: shellac-haskeline
+
+source-repository-package
+  type: git
+  location: https://github.com/haskell/haskeline
+  tag: 1ef56b16d3ed1f063211982668329d9e3113fd5b

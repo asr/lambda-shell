@@ -2,7 +2,7 @@
 
 ## 0.9.9.1 -- YYYY-mm-dd
 
-* Tested with GHC 9.10.1.
+* Tested with GHC 9.12.2.
 
 * Added `--fuel` option.
 
